@@ -1,0 +1,167 @@
+==========================================================
+EXERCICIOS SQL - SQL Server (T-SQL)
+==========================================================
+Obs: se o banco for MySQL, a unica mudanca e no item 4 do
+Iniciante: troque TOP 5 por LIMIT 5 no final da consulta.
+
+
+==========================================================
+INICIANTE
+==========================================================
+
+-- 1. Criar a tabela Produto
+CREATE TABLE Produto (
+    ID_Produto  INT IDENTITY(1,1) PRIMARY KEY,
+    Nome        VARCHAR(100)  NOT NULL,
+    Preco_Custo DECIMAL(10,2) NOT NULL,
+    Preco_Venda DECIMAL(10,2) NOT NULL
+);
+
+
+-- 2. Inserir 10 produtos (dois com prejuizo de proposito)
+INSERT INTO Produto (Nome, Preco_Custo, Preco_Venda) VALUES
+('Mouse Gamer',        45.00,  89.90),
+('Teclado Mecanico',  120.00, 249.90),
+('Monitor 24"',       500.00, 799.90),
+('Headset',            80.00, 159.90),
+('Webcam Full HD',     90.00, 179.90),
+('Cabo HDMI',          15.00,  12.00),  -- prejuizo
+('Mousepad',           10.00,  29.90),
+('SSD 480GB',         150.00, 289.90),
+('Hub USB',            35.00,  30.00),  -- prejuizo
+('Cadeira Gamer',     600.00, 999.90);
+
+
+-- 3. Atualizar o preco de venda de um produto
+-- (nunca esqueca o WHERE, senao atualiza todos os produtos)
+UPDATE Produto
+SET Preco_Venda = 99.90
+WHERE Nome = 'Mouse Gamer';
+
+
+-- 4. Os 5 produtos mais caros (ordem decrescente)
+SELECT TOP 5 Nome, Preco_Venda
+FROM Produto
+ORDER BY Preco_Venda DESC;
+
+
+-- 5. Excluir produtos em prejuizo
+DELETE FROM Produto
+WHERE Preco_Custo > Preco_Venda;
+
+
+
+==========================================================
+INTERMEDIARIO
+==========================================================
+
+-- 1. Criar ProdutoCategoria e ProdutoEstoque
+-- ON DELETE CASCADE apaga as linhas filhas quando o produto
+-- e excluido. Sem ele, o item 5 da erro de chave estrangeira.
+CREATE TABLE ProdutoCategoria (
+    ID_Categoria INT IDENTITY(1,1) PRIMARY KEY,
+    ID_Produto   INT NOT NULL,
+    Categoria    VARCHAR(50) NOT NULL,
+    CONSTRAINT FK_Categoria_Produto FOREIGN KEY (ID_Produto)
+        REFERENCES Produto(ID_Produto) ON DELETE CASCADE
+);
+
+CREATE TABLE ProdutoEstoque (
+    ID_Estoque INT IDENTITY(1,1) PRIMARY KEY,
+    ID_Produto INT NOT NULL,
+    Quantidade INT NOT NULL,
+    CONSTRAINT FK_Estoque_Produto FOREIGN KEY (ID_Produto)
+        REFERENCES Produto(ID_Produto) ON DELETE CASCADE
+);
+
+
+-- 2. Inserir categorias e estoque
+-- Busca o ID pelo nome, pois apos o DELETE os IDs nao sao
+-- mais sequenciais.
+INSERT INTO ProdutoCategoria (ID_Produto, Categoria)
+SELECT ID_Produto, 'Perifericos' FROM Produto
+WHERE Nome IN ('Mouse Gamer', 'Teclado Mecanico', 'Headset', 'Webcam Full HD', 'Mousepad');
+
+INSERT INTO ProdutoCategoria (ID_Produto, Categoria)
+SELECT ID_Produto, 'Hardware' FROM Produto
+WHERE Nome IN ('Monitor 24"', 'SSD 480GB');
+
+INSERT INTO ProdutoCategoria (ID_Produto, Categoria)
+SELECT ID_Produto, 'Mobiliario' FROM Produto
+WHERE Nome = 'Cadeira Gamer';
+
+INSERT INTO ProdutoEstoque (ID_Produto, Quantidade)
+SELECT ID_Produto, 20 FROM Produto;   -- quantidade inicial para todos
+
+-- Para quantidades diferentes por produto:
+-- UPDATE ProdutoEstoque SET Quantidade = X WHERE ID_Produto = Y;
+
+
+-- 3. Consulta com JOIN
+SELECT p.Nome, c.Categoria, e.Quantidade
+FROM Produto p
+INNER JOIN ProdutoCategoria c ON c.ID_Produto = p.ID_Produto
+INNER JOIN ProdutoEstoque   e ON e.ID_Produto = p.ID_Produto;
+
+
+-- 4. Inserir as roupas (produto, categoria e estoque)
+INSERT INTO Produto (Nome, Preco_Custo, Preco_Venda) VALUES
+('Calca Baggy',      70.00, 149.90),
+('Moletom Canguru',  90.00, 189.90),
+('Camiseta Preta',   20.00,  59.90);
+
+INSERT INTO ProdutoCategoria (ID_Produto, Categoria)
+SELECT ID_Produto, 'Roupas' FROM Produto
+WHERE Nome IN ('Calca Baggy', 'Moletom Canguru', 'Camiseta Preta');
+
+INSERT INTO ProdutoEstoque (ID_Produto, Quantidade)
+SELECT ID_Produto, 15 FROM Produto
+WHERE Nome IN ('Calca Baggy', 'Moletom Canguru', 'Camiseta Preta');
+
+
+-- 5. Excluir a categoria "Roupas" usando Subquery
+-- O CASCADE remove tambem as linhas de categoria e estoque.
+DELETE FROM Produto
+WHERE ID_Produto IN (
+    SELECT ID_Produto
+    FROM ProdutoCategoria
+    WHERE Categoria = 'Roupas'
+);
+
+
+-- 6. Criar a tabela Cliente
+-- Titulo e InicialMeio aceitam NULL (nem todo cliente tem).
+CREATE TABLE Cliente (
+    ID_Cliente   INT IDENTITY(1,1) PRIMARY KEY,
+    Titulo       VARCHAR(10) NULL,      -- Sr., Sra., Dr.
+    PrimeiroNome VARCHAR(50) NOT NULL,
+    InicialMeio  CHAR(1)     NULL,
+    UltimoNome   VARCHAR(50) NOT NULL
+);
+
+INSERT INTO Cliente (Titulo, PrimeiroNome, InicialMeio, UltimoNome) VALUES
+('Sr.',  'Carlos', 'A', 'Silva'),
+(NULL,   'Maria',  NULL, 'Souza'),
+('Dra.', 'Ana',    'M', 'Lima'),
+(NULL,   'Joao',   'P', 'Santos'),
+('Sr.',  'Pedro',  NULL, 'Costa');
+
+
+-- 7. Lista unica de nomes completos com CASE
+SELECT DISTINCT
+    CASE WHEN Titulo IS NULL THEN '' ELSE Titulo + ' ' END
+    + PrimeiroNome + ' '
+    + CASE WHEN InicialMeio IS NULL THEN '' ELSE InicialMeio + '. ' END
+    + UltimoNome AS NomeCompleto
+FROM Cliente;
+
+-- Resultado esperado:
+-- Dra. Ana M. Lima
+-- Joao P. Santos
+-- Maria Souza
+-- Sr. Carlos A. Silva
+-- Sr. Pedro Costa
+
+-- O CASE e necessario porque, no SQL Server, concatenar qualquer
+-- valor com NULL usando + resulta em NULL e o nome inteiro sumiria.
+-- O DISTINCT garante que nomes repetidos aparecam uma unica vez.
